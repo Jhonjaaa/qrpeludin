@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QRpeludo en Línea</title>
+
+    <!-- Meta redes sociales -->
+    <meta property="og:image" content="https://4tsix0yujj.ufs.sh/f/2vMRHqOYUHc0K5prXUEjR7oilQcqGuVyEA8Sm1pf4v95nLIB" />
+    <meta property="og:image:alt" content="Mascotas en línea" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://4tsix0yujj.ufs.sh/f/2vMRHqOYUHc0K5prXUEjR7oilQcqGuVyEA8Sm1pf4v95nLIB" />
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  </head>
+  <body class="bg-gradient-to-br from-gray-50 to-gray-200 font-sans text-gray-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, StrictMode } = React;
+      const { createRoot } = ReactDOM;
+
+      const firebaseConfig = {
+        apiKey: "TU_API_KEY",
+        authDomain: "TU_DOMINIO.firebaseapp.com",
+        projectId: "TU_PROJECT_ID",
+        storageBucket: "TU_BUCKET.appspot.com",
+        messagingSenderId: "TU_SENDER_ID",
+        appId: "TU_APP_ID",
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+      const storage = firebase.storage();
+
+      const PetCard = ({ pet, onEdit, onDelete }) => (
+        <div className="bg-white rounded-2xl shadow-xl p-6 hover:shadow-2xl transition transform hover:-translate-y-1">
+          <img src={pet.photo || 'https://via.placeholder.com/300'} alt={pet.name} className="w-full h-48 object-cover rounded-lg mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-800 mb-1">{pet.name}</h2>
+          <p className="text-gray-600"><strong>Dueño:</strong> {pet.ownerName}</p>
+          <p className="text-gray-600"><strong>Dirección:</strong> {pet.address}</p>
+          <p className="text-gray-600 mb-4"><strong>Teléfono:</strong> {pet.phone}</p>
+          <div className="flex justify-between">
+            <button onClick={() => onEdit(pet)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow">Editar</button>
+            <button onClick={() => onDelete(pet.id)} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 shadow">Eliminar</button>
+          </div>
+        </div>
+      );
+
+      const PetForm = ({ petToEdit, onSave, onCancel }) => {
+        const [pet, setPet] = useState(petToEdit || { name: '', ownerName: '', address: '', phone: '', photo: '' });
+        const [file, setFile] = useState(null);
+
+        const handleChange = (e) => {
+          const { name, value } = e.target;
+          setPet(prev => ({ ...prev, [name]: value }));
+        };
+
+        const handleFileChange = (e) => {
+          setFile(e.target.files[0]);
+        };
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          let photoURL = pet.photo;
+          if (file) {
+            const storageRef = storage.ref();
+            const fileRef = storageRef.child(`pets/${Date.now()}_${file.name}`);
+            await fileRef.put(file);
+            photoURL = await fileRef.getDownloadURL();
+          }
+
+          const newPet = { ...pet, photo: photoURL };
+
+          if (pet.id) {
+            await db.collection('pets').doc(pet.id).set(newPet);
+          } else {
+            await db.collection('pets').add(newPet);
+          }
+          onSave();
+        };
+
+        return (
+          <form onSubmit={handleSubmit} className="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-xl mx-auto mt-10">
+            <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">{pet.id ? 'Editar Mascota' : 'Agregar Mascota'}</h2>
+            {['name', 'ownerName', 'address', 'phone'].map(field => (
+              <div className="mb-4" key={field}>
+                <label className="block text-gray-700 font-medium mb-1 capitalize">{field}</label>
+                <input
+                  type="text"
+                  name={field}
+                  value={pet[field] || ''}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-400"
+                  required
+                />
+              </div>
+            ))}
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-1">Foto</label>
+              <input type="file" accept="image/*" onChange={handleFileChange} className="w-full" />
+              {pet.photo && <img src={pet.photo} alt="Preview" className="mt-4 w-32 h-32 object-cover rounded-lg" />}
+            </div>
+            <div className="flex justify-end gap-4 mt-6">
+              <button type="button" onClick={onCancel} className="bg-gray-300 px-6 py-2 rounded-xl hover:bg-gray-400 text-gray-800">Cancelar</button>
+              <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded-xl hover:bg-green-700">Guardar</button>
+            </div>
+          </form>
+        );
+      };
+
+      function App() {
+        const [pets, setPets] = useState([]);
+        const [editingPet, setEditingPet] = useState(null);
+
+        useEffect(() => {
+          const unsubscribe = db.collection('pets').onSnapshot(snapshot => {
+            const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setPets(docs);
+          });
+          return () => unsubscribe();
+        }, []);
+
+        const handleSave = () => {
+          setEditingPet(null);
+        };
+
+        const handleDelete = async (id) => {
+          await db.collection('pets').doc(id).delete();
+        };
+
+        return (
+          <div className="min-h-screen px-4 pb-10">
+            <header className="sticky top-0 z-50 bg-white shadow-md py-6 px-6 flex justify-between items-center">
+              <h1 className="text-4xl font-extrabold text-blue-700">QRpeludo</h1>
+              <button onClick={() => setEditingPet({})} className="bg-blue-600 text-white px-6 py-2 rounded-xl shadow hover:bg-blue-700">Agregar Mascota</button>
+            </header>
+
+            {editingPet ? (
+              <PetForm petToEdit={editingPet} onSave={handleSave} onCancel={() => setEditingPet(null)} />
+            ) : (
+              <section className="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {pets.map(pet => (
+                  <PetCard key={pet.id} pet={pet} onEdit={setEditingPet} onDelete={handleDelete} />
+                ))}
+              </section>
+            )}
+          </div>
+        );
+      }
+
+      const root = createRoot(document.getElementById("root"));
+      root.render(<StrictMode><App /></StrictMode>);
+    </script>
+  </body>
+</html>
